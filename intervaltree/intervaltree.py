@@ -612,7 +612,62 @@ class IntervalTree(collections.MutableSet):
             for bound in self.boundary_table 
             if begin < bound < end
         )
-    
+
+    def list_overlaps(self):
+        """List all intervals with overlapping ranges
+
+        Intervals will be grouped by their overlaps
+
+        Example (using interval notation):
+        Intervals: [0,3), [2,5), [6,9), [6,12), [12,15)
+        Overlaps: {[0,3), [2,5)}, {[6,9), [6,12)}
+        """
+        # If there is one or no intervals, there can't be any overlaps
+        if len(self) <= 1:
+            return []
+
+        # Iterate over each interval in this tree and check if its
+        # lower bound is inside any other intervals in this tree
+        overlap_ivs = set()
+        for lbound, ubound, _ in self.all_intervals:
+            overlaps = self[lbound]
+            # `overlaps` will be at least length 1 because of itself. We have
+            # an overlap when we overlap more than itself
+            if len(overlaps) > 1:
+                overlap_ivs.add(tuple(overlaps))
+        return sorted(overlap_ivs)
+
+    def list_gaps(self):
+        """List all of the gaps between intervals.
+
+        Gaps will be listed as the endpoints of the surrounding intervals.
+        This will not list the gaps: [-inf., self.begin()], or
+        [self.end(), inf.]
+
+        Example (using interval notation):
+        Intervals: [0,1), [3,5), [7,11)
+        Gaps: (1,3), (5,7)
+        """
+        # If there is one or no intervals, there can't be any gaps
+        if len(self) <= 1:
+            return []
+
+        # Build a complementary IntervalTree, which is essentially the
+        # opposite IntervalTree of self. See the docstring
+        result = IntervalTree(intervals=[self.range()])
+        for lbound, ubound, _ in self.all_intervals:
+            result.chop(lbound, ubound)
+
+        # Exclude gaps that aren't really gaps. The gap needs to be more
+        # than one, otherwise it isn't a gap, but actually two intervals
+        # side-by-side. e.g. (1,2), (3,4)
+        gaps = set()
+        for gap in result.all_intervals:
+            lbound, ubound, _ = gap
+            if ubound > (lbound + 1):
+                gaps.add(gap)
+        return sorted(gaps)
+
     def split_overlaps(self):
         """
         Finds all intervals with overlapping ranges and splits them
